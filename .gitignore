@@ -1,0 +1,11 @@
+# Игнорировать все CSV в data/raw/
+data/raw/*.csv
+
+data/processed/*.csv
+
+# Игнорировать виртуальное окружение
+.venv/
+
+__pycache__/
+
+.ipynb_checkpoints/

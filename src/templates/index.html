@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CreditAI — Система кредитного скоринга</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080c14;
+      --surface: #0d1524;
+      --surface2: #111d30;
+      --border: rgba(99,179,237,0.12);
+      --border-active: rgba(99,179,237,0.45);
+      --accent: #3b82f6;
+      --accent2: #06b6d4;
+      --text: #e2eaf4;
+      --text-dim: #64748b;
+      --text-muted: #334155;
+      --approve: #10b981;
+      --reject: #ef4444;
+      --warn: #f59e0b;
+      --grid: rgba(255,255,255,0.025);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background grid ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Glow blobs ── */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.18;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .blob-1 { width: 500px; height: 500px; background: var(--accent); top: -100px; left: -80px; }
+    .blob-2 { width: 380px; height: 380px; background: var(--accent2); bottom: -80px; right: -60px; }
+
+    /* ── Layout ── */
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 48px 0 56px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      animation: fadeDown .6s ease both;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+    }
+
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, var(--text) 60%, var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(32px, 6vw, 56px);
+      line-height: 1.05;
+      letter-spacing: -1.5px;
+    }
+
+    .header-title span {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-sub {
+      color: var(--text-dim);
+      font-size: 13px;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.25);
+      border-radius: 100px;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: #93c5fd;
+      letter-spacing: 0.5px;
+      width: fit-content;
+    }
+
+    .badge .dot {
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      animation: fadeUp .5s ease both;
+    }
+
+    .card + .card { margin-top: 20px; }
+
+    .card-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title::before {
+      content: '';
+      display: inline-block;
+      width: 16px; height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+
+    /* ── Form grid ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .form-group.full { grid-column: 1 / -1; }
+
+    label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    input, select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      padding: 11px 14px;
+      transition: border-color .2s, box-shadow .2s;
+      outline: none;
+      width: 100%;
+      -webkit-appearance: none;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--border-active);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+    }
+
+    input::placeholder { color: var(--text-muted); }
+
+    select option { background: var(--surface2); }
+
+    /* ── Slider ── */
+    .slider-group { gap: 10px; }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .slider-value {
+      font-size: 13px;
+      color: var(--accent);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      background: var(--surface2);
+      border: none;
+      border-radius: 2px;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(59,130,246,0.5);
+      cursor: pointer;
+    }
+
+    input[type="range"]:focus { box-shadow: none; border-color: transparent; }
+
+    /* ── Button ── */
+    .btn-row {
+      margin-top: 28px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .btn-submit {
+      flex: 1;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      padding: 14px 32px;
+      cursor: pointer;
+      transition: opacity .2s, transform .15s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-submit:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-submit:active { transform: translateY(0); }
+
+    .btn-submit .spinner {
+      display: none;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: auto;
+    }
+
+    .btn-submit.loading .btn-label { display: none; }
+    .btn-submit.loading .spinner { display: block; }
+
+    .btn-reset {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      padding: 14px 20px;
+      cursor: pointer;
+      transition: border-color .2s, color .2s;
+    }
+
+    .btn-reset:hover { border-color: var(--border-active); color: var(--text); }
+
+    /* ── Result ── */
+    #result-card {
+      display: none;
+      animation: fadeUp .4s ease both;
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .verdict {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .verdict-badge {
+      font-family: 'Syne', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .verdict-badge.approve { color: var(--approve); }
+    .verdict-badge.reject  { color: var(--reject); }
+
+    .verdict-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+
+    .verdict-icon.approve { background: rgba(16,185,129,.12); }
+    .verdict-icon.reject  { background: rgba(239,68,68,.12); }
+
+    /* ── Metrics row ── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 24px;
+    }
+
+    .metric {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+
+    .metric-label {
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    /* ── Progress bar ── */
+    .prob-bar-wrap {
+      margin-top: 24px;
+    }
+
+    .prob-bar-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .prob-track {
+      height: 8px;
+      background: var(--surface2);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+
+    .prob-fill {
+      height: 100%;
+      border-radius: 100px;
+      width: 0;
+      transition: width .8s cubic-bezier(.4,0,.2,1);
+    }
+
+    .prob-fill.low    { background: linear-gradient(90deg, #10b981, #34d399); }
+    .prob-fill.medium { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .prob-fill.high   { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+    /* ── Error ── */
+    #error-msg {
+      display: none;
+      background: rgba(239,68,68,.08);
+      border: 1px solid rgba(239,68,68,.2);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: #fca5a5;
+      margin-top: 16px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 64px;
+      border-top: 1px solid var(--border);
+      padding-top: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeDown { from { opacity:0; transform:translateY(-16px); } to { opacity:1; transform:none; } }
+    @keyframes fadeUp   { from { opacity:0; transform:translateY(16px);  } to { opacity:1; transform:none; } }
+    @keyframes spin     { to { transform:rotate(360deg); } }
+    @keyframes pulse    { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+    .card:nth-child(2) { animation-delay: .1s; }
+    .card:nth-child(3) { animation-delay: .2s; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-group.full { grid-column: auto; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .metrics .metric:last-child { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⬡</div>
+      <div class="logo-text">CreditAI</div>
+    </div>
+    <h1 class="header-title">Кредитный<br><span>скоринг</span></h1>
+    <div class="badge"><span class="dot"></span> XGBoost · Home Credit Risk Model</div>
+    <p class="header-sub">// Анализ вероятности дефолта на основе ML-модели</p>
+  </header>
+
+  <!-- Form card -->
+  <div class="card">
+    <div class="card-title">Данные заявителя</div>
+
+    <form id="credit-form">
+      <div class="form-grid">
+
+        <!-- Финансы -->
+        <div class="form-group">
+          <label>Годовой доход (Kč)</label>
+          <input type="number" name="AMT_INCOME_TOTAL" placeholder="270 000" min="0" step="1000" required />
+        </div>
+
+        <div class="form-group">
+          <label>Сумма кредита (Kč)</label>
+          <input type="number" name="AMT_CREDIT" placeholder="500 000" min="0" step="1000" required />
+        </div>
+
+        <div class="form-group">
+          <label>Ежегодный платёж (Kč)</label>
+          <input type="number" name="AMT_ANNUITY" placeholder="30 000" min="0" step="500" required />
+        </div>
+
+        <!-- Возраст -->
+        <div class="form-group slider-group">
+          <div class="slider-header">
+            <label>Возраст</label>
+            <span class="slider-value" id="age-val">35 лет</span>
+          </div>
+          <input type="range" name="AGE_YEARS" min="18" max="70" value="35"
+                 oninput="document.getElementById('age-val').textContent = this.value + ' лет'" />
+        </div>
+
+        <!-- Стаж -->
+        <div class="form-group slider-group">
+          <div class="slider-header">
+            <label>Стаж работы</label>
+            <span class="slider-value" id="emp-val">5 лет</span>
+          </div>
+          <input type="range" name="EMPLOYED_YEARS" min="0" max="40" value="5"
+                 oninput="document.getElementById('emp-val').textContent = this.value + ' лет'" />
+        </div>
+
+        <!-- Пол -->
+        <div class="form-group">
+          <label>Пол</label>
+          <select name="CODE_GENDER">
+            <option value="0">Женщина</option>
+            <option value="1">Мужчина</option>
+          </select>
+        </div>
+
+        <!-- Образование -->
+        <div class="form-group">
+          <label>Образование</label>
+          <select name="NAME_EDUCATION_TYPE">
+            <option value="0">Неполное среднее</option>
+            <option value="1">Среднее</option>
+            <option value="2">Среднее специальное</option>
+            <option value="3">Незаконченное высшее</option>
+            <option value="4" selected>Высшее</option>
+            <option value="5">Учёная степень</option>
+          </select>
+        </div>
+
+        <!-- EXT SOURCES -->
+        <div class="form-group slider-group">
+          <div class="slider-header">
+            <label>Внешний рейтинг 1</label>
+            <span class="slider-value" id="ext1-val">0.50</span>
+          </div>
+          <input type="range" name="EXT_SOURCE_1" min="0" max="1" step="0.01" value="0.5"
+                 oninput="document.getElementById('ext1-val').textContent = parseFloat(this.value).toFixed(2)" />
+        </div>
+
+        <div class="form-group slider-group">
+          <div class="slider-header">
+            <label>Внешний рейтинг 2</label>
+            <span class="slider-value" id="ext2-val">0.50</span>
+          </div>
+          <input type="range" name="EXT_SOURCE_2" min="0" max="1" step="0.01" value="0.5"
+                 oninput="document.getElementById('ext2-val').textContent = parseFloat(this.value).toFixed(2)" />
+        </div>
+
+        <div class="form-group slider-group">
+          <div class="slider-header">
+            <label>Внешний рейтинг 3</label>
+            <span class="slider-value" id="ext3-val">0.50</span>
+          </div>
+          <input type="range" name="EXT_SOURCE_3" min="0" max="1" step="0.01" value="0.5"
+                 oninput="document.getElementById('ext3-val').textContent = parseFloat(this.value).toFixed(2)" />
+        </div>
+
+      </div><!-- /form-grid -->
+
+      <div class="btn-row">
+        <button type="submit" class="btn-submit">
+          <span class="btn-label">Оценить риск →</span>
+          <div class="spinner"></div>
+        </button>
+        <button type="reset" class="btn-reset" onclick="resetForm()">Сбросить</button>
+      </div>
+
+      <div id="error-msg"></div>
+    </form>
+  </div>
+
+  <!-- Result card -->
+  <div class="card" id="result-card">
+    <div class="card-title">Результат анализа</div>
+
+    <div class="result-header">
+      <div class="verdict">
+        <div class="verdict-icon" id="v-icon"></div>
+        <div class="verdict-badge" id="v-badge"></div>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-label">Вероятность дефолта</div>
+        <div class="metric-value" id="m-prob" style="color: var(--accent)">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Уровень риска</div>
+        <div class="metric-value" id="m-risk">—</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Решение модели</div>
+        <div class="metric-value" id="m-decision">—</div>
+      </div>
+    </div>
+
+    <div class="prob-bar-wrap">
+      <div class="prob-bar-labels">
+        <span>Низкий риск</span>
+        <span>Высокий риск</span>
+      </div>
+      <div class="prob-track">
+        <div class="prob-fill" id="prob-fill"></div>
+      </div>
+    </div>
+
+    <div class="shap-container" style="margin-top: 32px; border-top: 1px solid var(--border); padding-top: 24px;">
+      <div class="card-title" style="margin-bottom: 16px;">Почему такое решение? (SHAP)</div>
+      <div style="background: white; padding: 10px; border-radius: 12px; overflow: hidden;">
+        <img id="shap-img" src="" alt="SHAP Analysis" style="width: 100%; height: auto; display: block;" />
+      </div>
+      <p style="font-size: 11px; color: var(--text-dim); margin-top: 10px; line-height: 1.4;">
+        * Красные полосы толкают вероятность дефолта <strong>вверх</strong> (риск выше).<br>
+        * Синие полосы тянут <strong>вниз</strong> (риск ниже).
+      </p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <span>CreditAI · XGBoost v1</span>
+    <span>Home Credit Default Risk</span>
+  </footer>
+
+</div>
+
+<script>
+  const form = document.getElementById('credit-form');
+  const resultCard = document.getElementById('result-card');
+  const errorMsg = document.getElementById('error-msg');
+  const submitBtn = form.querySelector('.btn-submit');
+
+  const riskColors = { Low: 'var(--approve)', Medium: 'var(--warn)', High: 'var(--reject)' };
+  const riskRu    = { Low: 'Низкий', Medium: 'Средний', High: 'Высокий' };
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorMsg.style.display = 'none';
+    resultCard.style.display = 'none';
+    submitBtn.classList.add('loading');
+
+    const fd = new FormData(form);
+    const payload = {};
+    for (const [k, v] of fd.entries()) payload[k] = parseFloat(v);
+
+    try {
+      const res = await fetch('/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      renderResult(data);
+
+    } catch (err) {
+      errorMsg.textContent = '⚠ Ошибка: ' + err.message;
+      errorMsg.style.display = 'block';
+    } finally {
+      submitBtn.classList.remove('loading');
+    }
+  });
+
+  function renderResult({ probability, decision, risk_level, shap_plot }) {
+    const isApprove = decision === 'Approve';
+    const pct = Math.round(probability * 100);
+
+    // Verdict
+    const vIcon  = document.getElementById('v-icon');
+    const vBadge = document.getElementById('v-badge');
+    vIcon.textContent  = isApprove ? '✓' : '✕';
+    vIcon.className    = 'verdict-icon ' + (isApprove ? 'approve' : 'reject');
+    vBadge.textContent = isApprove ? 'Одобрено' : 'Отказано';
+    vBadge.className   = 'verdict-badge ' + (isApprove ? 'approve' : 'reject');
+
+    // Metrics
+    document.getElementById('m-prob').textContent = pct + '%';
+    const riskEl = document.getElementById('m-risk');
+    riskEl.textContent  = riskRu[risk_level] || risk_level;
+    riskEl.style.color  = riskColors[risk_level] || 'var(--text)';
+
+    const decEl = document.getElementById('m-decision');
+    decEl.textContent = isApprove ? 'Одобрить' : 'Отказать';
+    decEl.style.color = isApprove ? 'var(--approve)' : 'var(--reject)';
+
+    // Bar
+    const fill = document.getElementById('prob-fill');
+    fill.className = 'prob-fill ' + risk_level.toLowerCase();
+    setTimeout(() => fill.style.width = pct + '%', 50);
+
+    
+
+    // Отображаем SHAP
+    const img = document.getElementById('shap-img');
+    if (shap_plot) {
+        img.src = "data:image/png;base64," + shap_plot;
+    }
+    
+    // Показываем карточку
+    resultCard.style.display = 'block';
+    resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function resetForm() {
+    // Reset sliders display
+    document.getElementById('age-val').textContent  = '35 лет';
+    document.getElementById('emp-val').textContent  = '5 лет';
+    document.getElementById('ext1-val').textContent = '0.50';
+    document.getElementById('ext2-val').textContent = '0.50';
+    document.getElementById('ext3-val').textContent = '0.50';
+    resultCard.style.display = 'none';
+    errorMsg.style.display   = 'none';
+  }
+</script>
+</body>
+</html>
