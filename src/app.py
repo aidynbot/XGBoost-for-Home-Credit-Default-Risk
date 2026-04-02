@@ -7,12 +7,18 @@ import matplotlib
 import matplotlib.pyplot as plt
 import io
 import base64
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles # Если понадобятся стили отдельно
 from pydantic import BaseModel
+from pricing_engine import engine as pricing_engine
+from rule_based import get_rule_based_explanation
+# from llm_explainer import get_ai_explanation
 
+load_dotenv()
 matplotlib.use('Agg')
 
 app = FastAPI(title="CreditAI Scoring System")
@@ -20,14 +26,7 @@ templates = Jinja2Templates(directory="templates")
 
 # Пути к файлам
 MODEL_PATH = '../models/xgboost_credit.json' # Проверь имя файла! Ты писал xgboost_credit.json в прошлом шаге
-# Если ты не сохранял список колонок отдельно, его можно вытащить из модели (иногда),
-# но лучше использовать тот pickle, если он есть. Если нет - скажи, напишу как вытащить.
-# Предположим, список колонок есть:
-# COLUMNS_PATH = '../models/model_columns.pkl'
-# model_columns = joblib.load(COLUMNS_PATH)
 
-# ВРЕМЕННОЕ РЕШЕНИЕ: Если нет файла с колонками, модель сама их знает,
-# но нам нужно соблюсти порядок при создании DataFrame.
 # Давай загрузим модель:
 model = xgb.Booster()
 model.load_model(MODEL_PATH)
@@ -100,24 +99,40 @@ def prepare_features(data_dict):
 
     return final_df.astype('float32')
 
-def generate_shap_plot(df):
+def extract_top_shap_features(shap_explanation, top_n=3):
+    """
+    Извлекает топ-N признаков с самым сильным влиянием.
+    Возвращает список строк, понятных для LLM.
+    """
+    # shap_explanation — это shap_values[0]
+    values = shap_explanation.values
+    names = shap_explanation.feature_names
+    
+    # Объединяем названия и значения, сортируем по абсолютному значению (силе влияния)
+    feature_impacts = list(zip(names, values))
+    feature_impacts.sort(key=lambda x: abs(x[1]), reverse=True)
+    
+    top_features = []
+    for name, impact in feature_impacts[:top_n]:
+        # Переводим в понятный язык для ИИ
+        direction = "повышает риск" if impact > 0 else "снижает риск"
+        top_features.append(f"{name} ({direction})")
+        
+    return top_features
+
+
+def generate_shap_plot(shap_explanation): # <--- Изменили аргумент
     """Генерирует график SHAP Waterfall и возвращает его как base64 строку"""
-    # Вычисляем SHAP значения для одной строки
-    shap_values = explainer(df)
-    
-    # Создаем график
     plt.figure(figsize=(10, 6))
-    # waterfall отображает вклад каждого признака
-    # shap_values[0] - берем первый (и единственный) элемент, так как у нас одна заявка
-    shap.plots.waterfall(shap_values[0], max_display=10, show=False)
     
-    # Сохраняем в буфер
+    # Передаем готовый объект, max_display=10
+    shap.plots.waterfall(shap_explanation, max_display=10, show=False)
+    
     buf = io.BytesIO()
     plt.savefig(buf, format="png", bbox_inches='tight', dpi=100)
-    plt.close() # Обязательно закрываем, чтобы не забивать память
+    plt.close() 
     buf.seek(0)
     
-    # Кодируем в base64
     img_str = base64.b64encode(buf.read()).decode("utf-8")
     return img_str
 
@@ -125,34 +140,60 @@ def generate_shap_plot(df):
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+# Не забудь импортировать функцию для LLM, если будешь ее использовать
+# from llm_explainer import get_ai_explanation 
+
 @app.post("/predict")
 async def predict(data: ClientData):
-    # model_dump() работает в Pydantic v2. Если v1, используй data.dict()
     try:
         input_data = data.model_dump()
     except AttributeError:
         input_data = data.dict()
     
     final_df = prepare_features(input_data)
-    
-    # Создаем DMatrix. Важно передать feature_names, чтобы порядок совпал с JSON
+    features_dict = final_df.iloc[0].to_dict()
+
     dmatrix = xgb.DMatrix(final_df, feature_names=model_columns)
     
     # Предсказание
     probability = float(model.predict(dmatrix)[0])
+
+    # Считаем финансовые условия (Risk-Based Pricing)
+    pricing = pricing_engine.calculate_rate(probability)
     
-    shap_image_base64 = generate_shap_plot(final_df)
+    shap_values = explainer(final_df)
+    single_explanation = shap_values[0]
+    # Генерация графика
+    shap_image_base64 = generate_shap_plot(single_explanation)
+    explanation = get_rule_based_explanation(features_dict, probability)
+    
+    top_features_list = extract_top_shap_features(single_explanation, top_n=3)
 
-    # Логика решения (порог можно подкрутить)
-    risk_level = "High" if probability > 0.5 else ("Medium" if probability > 0.2 else "Low")
-    decision = "Reject" if probability > 0.5 else "Approve"
+    # Логика уровня риска (важно для UI прогресс-бара)
+    # Пороги лучше ставить логичные: < 0.2 (Low), 0.2 - 0.5 (Medium), > 0.5 (High)
+    if probability > 0.5:
+        risk_level = "High"
+    elif probability > 0.2:
+        risk_level = "Medium"
+    else:
+        risk_level = "Low"
+    
+    # Базовое решение модели (без учета прайсинга, чисто ML)
+    classic_decision = "Reject" if probability > 0.5 else "Approve"
 
-    return {
+    response = {
         "probability": round(probability, 4),
-        "decision": decision,
-        "risk_level": risk_level,
-        "shap_plot": shap_image_base64
+        "risk_level": risk_level,                 # ИСПРАВЛЕНО: Вернули для фронтенда
+        "classic_decision": classic_decision,     # Базовый ML вердикт
+        "decision": pricing["decision"],          # Итоговый вердикт от бизнес-логики (Pricing)
+        "custom_rate": pricing["rate"],           # Ставка
+        "risk_premium": pricing.get("premium", 0),
+        "market_diff": pricing.get("market_comparison", 0),
+        "shap_plot": shap_image_base64,
+        "explanation": explanation,                # Текст от LLM
     }
+
+    return response
 
 if __name__ == "__main__":
     import uvicorn

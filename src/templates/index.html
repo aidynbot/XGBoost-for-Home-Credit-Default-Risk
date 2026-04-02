@@ -383,6 +383,46 @@
       font-weight: 700;
     }
 
+    /* ── NEW: Risk Based Pricing Box ── */
+    .rbp-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 14px;
+      padding: 16px 18px;
+      background: rgba(16, 185, 129, 0.05);
+      border: 1px dashed rgba(16, 185, 129, 0.3);
+      border-radius: 10px;
+    }
+
+    /* ── NEW: AI Advisor Box ── */
+    .ai-box {
+      margin-top: 24px;
+      background: rgba(6, 182, 212, 0.08);
+      border: 1px solid rgba(6, 182, 212, 0.2);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+    }
+
+    .ai-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--accent2);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ai-text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #e2eaf4;
+      white-space: pre-wrap; /* Сохраняет абзацы от LLM */
+    }
+
     /* ── Progress bar ── */
     .prob-bar-wrap {
       margin-top: 24px;
@@ -456,6 +496,7 @@
       .form-group.full { grid-column: auto; }
       .metrics { grid-template-columns: 1fr 1fr; }
       .metrics .metric:last-child { grid-column: 1 / -1; }
+      .rbp-box { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -466,7 +507,6 @@
 
 <div class="wrapper">
 
-  <!-- Header -->
   <header>
     <div class="logo">
       <div class="logo-icon">⬡</div>
@@ -477,14 +517,12 @@
     <p class="header-sub">// Анализ вероятности дефолта на основе ML-модели</p>
   </header>
 
-  <!-- Form card -->
   <div class="card">
     <div class="card-title">Данные заявителя</div>
 
     <form id="credit-form">
       <div class="form-grid">
 
-        <!-- Финансы -->
         <div class="form-group">
           <label>Годовой доход (Kč)</label>
           <input type="number" name="AMT_INCOME_TOTAL" placeholder="270 000" min="0" step="1000" required />
@@ -500,7 +538,6 @@
           <input type="number" name="AMT_ANNUITY" placeholder="30 000" min="0" step="500" required />
         </div>
 
-        <!-- Возраст -->
         <div class="form-group slider-group">
           <div class="slider-header">
             <label>Возраст</label>
@@ -510,7 +547,6 @@
                  oninput="document.getElementById('age-val').textContent = this.value + ' лет'" />
         </div>
 
-        <!-- Стаж -->
         <div class="form-group slider-group">
           <div class="slider-header">
             <label>Стаж работы</label>
@@ -520,7 +556,6 @@
                  oninput="document.getElementById('emp-val').textContent = this.value + ' лет'" />
         </div>
 
-        <!-- Пол -->
         <div class="form-group">
           <label>Пол</label>
           <select name="CODE_GENDER">
@@ -529,7 +564,6 @@
           </select>
         </div>
 
-        <!-- Образование -->
         <div class="form-group">
           <label>Образование</label>
           <select name="NAME_EDUCATION_TYPE">
@@ -542,7 +576,6 @@
           </select>
         </div>
 
-        <!-- EXT SOURCES -->
         <div class="form-group slider-group">
           <div class="slider-header">
             <label>Внешний рейтинг 1</label>
@@ -570,9 +603,7 @@
                  oninput="document.getElementById('ext3-val').textContent = parseFloat(this.value).toFixed(2)" />
         </div>
 
-      </div><!-- /form-grid -->
-
-      <div class="btn-row">
+      </div><div class="btn-row">
         <button type="submit" class="btn-submit">
           <span class="btn-label">Оценить риск →</span>
           <div class="spinner"></div>
@@ -584,7 +615,6 @@
     </form>
   </div>
 
-  <!-- Result card -->
   <div class="card" id="result-card">
     <div class="card-title">Результат анализа</div>
 
@@ -610,6 +640,19 @@
       </div>
     </div>
 
+    <div id="rbp-container" style="display: none;">
+      <div class="rbp-box">
+        <div>
+          <div class="metric-label" style="color: #10b981;">Предложенная ставка</div>
+          <div class="metric-value" id="m-rate" style="color: #10b981;">—</div>
+        </div>
+        <div>
+          <div class="metric-label">Премия за риск</div>
+          <div class="metric-value" id="m-premium" style="color: var(--text);">—</div>
+        </div>
+      </div>
+    </div>
+
     <div class="prob-bar-wrap">
       <div class="prob-bar-labels">
         <span>Низкий риск</span>
@@ -620,8 +663,13 @@
       </div>
     </div>
 
+    <div class="ai-box">
+      <div class="ai-title">✨ Вердикт</div>
+      <div class="ai-text" id="ai-content">Загрузка рекомендаций...</div>
+    </div>
+
     <div class="shap-container" style="margin-top: 32px; border-top: 1px solid var(--border); padding-top: 24px;">
-      <div class="card-title" style="margin-bottom: 16px;">Почему такое решение? (SHAP)</div>
+      <div class="card-title" style="margin-bottom: 16px;">Факторы влияния (SHAP)</div>
       <div style="background: white; padding: 10px; border-radius: 12px; overflow: hidden;">
         <img id="shap-img" src="" alt="SHAP Analysis" style="width: 100%; height: auto; display: block;" />
       </div>
@@ -632,10 +680,9 @@
     </div>
   </div>
 
-  <!-- Footer -->
   <footer>
-    <span>CreditAI · XGBoost v1</span>
-    <span>Home Credit Default Risk</span>
+    <span>CreditAI · XGBoost</span>
+    <span>Home Credit Risk Pricing Model</span>
   </footer>
 
 </div>
@@ -682,11 +729,12 @@
     }
   });
 
-  function renderResult({ probability, decision, risk_level, shap_plot }) {
+  // Обновленная функция рендера с новыми полями
+  function renderResult({ probability, decision, risk_level, custom_rate, risk_premium, explanation, shap_plot }) {
     const isApprove = decision === 'Approve';
     const pct = Math.round(probability * 100);
 
-    // Verdict
+    // Вердикт
     const vIcon  = document.getElementById('v-icon');
     const vBadge = document.getElementById('v-badge');
     vIcon.textContent  = isApprove ? '✓' : '✕';
@@ -694,8 +742,9 @@
     vBadge.textContent = isApprove ? 'Одобрено' : 'Отказано';
     vBadge.className   = 'verdict-badge ' + (isApprove ? 'approve' : 'reject');
 
-    // Metrics
+    // Базовые метрики
     document.getElementById('m-prob').textContent = pct + '%';
+    
     const riskEl = document.getElementById('m-risk');
     riskEl.textContent  = riskRu[risk_level] || risk_level;
     riskEl.style.color  = riskColors[risk_level] || 'var(--text)';
@@ -704,14 +753,25 @@
     decEl.textContent = isApprove ? 'Одобрить' : 'Отказать';
     decEl.style.color = isApprove ? 'var(--approve)' : 'var(--reject)';
 
-    // Bar
+    // NEW: Risk-Based Pricing Логика
+    const rbpContainer = document.getElementById('rbp-container');
+    if (isApprove && custom_rate) {
+      document.getElementById('m-rate').textContent = custom_rate + '%';
+      document.getElementById('m-premium').textContent = '+' + risk_premium + '%';
+      rbpContainer.style.display = 'block';
+    } else {
+      rbpContainer.style.display = 'none'; // Скрываем блок со ставкой, если отказ
+    }
+
+    // Rule based Explanation Layer
+    document.getElementById('ai-content').textContent = explanation || "Рекомендации отсутствуют.";
+
+    // Прогресс-бар
     const fill = document.getElementById('prob-fill');
     fill.className = 'prob-fill ' + risk_level.toLowerCase();
     setTimeout(() => fill.style.width = pct + '%', 50);
 
-    
-
-    // Отображаем SHAP
+    // График SHAP
     const img = document.getElementById('shap-img');
     if (shap_plot) {
         img.src = "data:image/png;base64," + shap_plot;
@@ -723,7 +783,6 @@
   }
 
   function resetForm() {
-    // Reset sliders display
     document.getElementById('age-val').textContent  = '35 лет';
     document.getElementById('emp-val').textContent  = '5 лет';
     document.getElementById('ext1-val').textContent = '0.50';

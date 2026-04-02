@@ -5,7 +5,9 @@ data/processed/*.csv
 
 # Игнорировать виртуальное окружение
 .venv/
-
+.env/
+.env
+llm_explainer.py
 __pycache__/
 
 .ipynb_checkpoints/
