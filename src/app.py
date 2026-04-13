@@ -159,8 +159,7 @@ async def predict(data: ClientData):
     probability = float(model.predict(dmatrix)[0])
 
     # Считаем финансовые условия (Risk-Based Pricing)
-    pricing = pricing_engine.calculate_rate(probability)
-    
+    pricing = pricing_engine.calculate_rate(probability, features=features_dict)
     shap_values = explainer(final_df)
     single_explanation = shap_values[0]
     # Генерация графика
@@ -188,9 +187,11 @@ async def predict(data: ClientData):
         "decision": pricing["decision"],          # Итоговый вердикт от бизнес-логики (Pricing)
         "custom_rate": pricing["rate"],           # Ставка
         "risk_premium": pricing.get("premium", 0),
+        "loyalty_discount": pricing.get("loyalty_discount", 0),
+        "optimization_discount": pricing.get("optimization_discount", 0),
         "market_diff": pricing.get("market_comparison", 0),
         "shap_plot": shap_image_base64,
-        "explanation": explanation,                # Текст от LLM
+        "explanation": explanation,               
     }
 
     return response

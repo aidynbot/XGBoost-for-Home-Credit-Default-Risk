@@ -1,0 +1,19 @@
+==================================================
+ОЦЕНКА МОДЕЛИ XGBOOST
+==================================================
+
+ROC AUC Score:        0.7695
+Accuracy:             0.7187
+Precision:            0.1759
+Recall (Sensitivity): 0.6745
+Specificity (TNR):    0.7225
+F1-Score:             0.2791
+Balanced Accuracy:    0.6985
+G-mean:               0.6981
+MCC:                  0.2340
+Cohen's Kappa:        0.1732
+FPR:                  0.2775
+
+Confusion Matrix:
+  TN: 40850, FP: 15687
+  FN: 1616, TP: 3349

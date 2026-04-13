@@ -650,6 +650,10 @@
           <div class="metric-label">Премия за риск</div>
           <div class="metric-value" id="m-premium" style="color: var(--text);">—</div>
         </div>
+        <div>
+          <div class="metric-label">Лояльность</div>
+          <div class="metric-value" id="m-loyalty" style="color: var(--text);">—</div>
+        </div>
       </div>
     </div>
 
@@ -730,7 +734,7 @@
   });
 
   // Обновленная функция рендера с новыми полями
-  function renderResult({ probability, decision, risk_level, custom_rate, risk_premium, explanation, shap_plot }) {
+  function renderResult({ probability, decision, risk_level, custom_rate, risk_premium, optimization_discount, explanation, shap_plot }) {
     const isApprove = decision === 'Approve';
     const pct = Math.round(probability * 100);
 
@@ -758,6 +762,8 @@
     if (isApprove && custom_rate) {
       document.getElementById('m-rate').textContent = custom_rate + '%';
       document.getElementById('m-premium').textContent = '+' + risk_premium + '%';
+      document.getElementById('m-loyalty').textContent = '-' + optimization_discount + '%';
+
       rbpContainer.style.display = 'block';
     } else {
       rbpContainer.style.display = 'none'; // Скрываем блок со ставкой, если отказ

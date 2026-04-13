@@ -1,0 +1,29 @@
+{
+    "model_path": "../models\\xgboost_credit3.json",
+    "timestamp": "20260408_175146",
+    "data_info": {
+        "shape": "(307507, 109)",
+        "default_rate": 0.08072986956394489
+    },
+    "metrics": {
+        "roc_auc": 0.7695478177976152,
+        "pr_auc": 0.26269903661360283,
+        "accuracy": 0.7186595557868036,
+        "precision": 0.17592981718848497,
+        "recall": 0.6745216515609265,
+        "f1_score": 0.2790717053456106,
+        "specificity": 0.7225356845959283
+    },
+    "optimal_threshold": {
+        "threshold": 0.4326283987915408,
+        "precision": 0.2500291002211617,
+        "recall": 0.4326283987915408,
+        "f1_score": 0.3169076423259586
+    },
+    "confusion_matrix": {
+        "tn": 40850,
+        "fp": 15687,
+        "fn": 1616,
+        "tp": 3349
+    }
+}
